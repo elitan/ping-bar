@@ -9,7 +9,6 @@ let package = Package(
             name: "PingBar",
             path: "Sources/PingBar",
             linkerSettings: [
-                .linkedFramework("CoreWLAN"),
                 .linkedFramework("ServiceManagement")
             ]
         )

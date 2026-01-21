@@ -1,35 +1,23 @@
 import Cocoa
-import ServiceManagement
+import SwiftUI
 
 class StatusBarController {
     private var statusItem: NSStatusItem
     private let pingService = PingService()
-    private let wifiMonitor = WifiMonitor()
-    private var isRunning = false
+    private var settingsWindow: NSWindow?
 
     private var startMenuItem: NSMenuItem!
     private var stopMenuItem: NSMenuItem!
-    private var autoStartMenuItem: NSMenuItem!
-    private var manageNetworksMenuItem: NSMenuItem!
-    private var launchAtLoginMenuItem: NSMenuItem!
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         setupStatusItem()
         setupMenu()
         setupPingService()
-        setupWifiMonitor()
-
-        if wifiMonitor.shouldAutoStart() {
-            startPing()
-        }
     }
 
     private func setupStatusItem() {
-        if let button = statusItem.button {
-            button.title = "---"
-            button.font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        }
+        updateDisplay(latency: nil)
     }
 
     private func setupMenu() {
@@ -46,21 +34,9 @@ class StatusBarController {
 
         menu.addItem(NSMenuItem.separator())
 
-        autoStartMenuItem = NSMenuItem(title: "Auto-start on: \(wifiMonitor.currentSSID ?? "No WiFi")", action: #selector(toggleAutoStart), keyEquivalent: "")
-        autoStartMenuItem.target = self
-        updateAutoStartMenuItem()
-        menu.addItem(autoStartMenuItem)
-
-        manageNetworksMenuItem = NSMenuItem(title: "Manage Networks...", action: #selector(showManageNetworks), keyEquivalent: "")
-        manageNetworksMenuItem.target = self
-        menu.addItem(manageNetworksMenuItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        launchAtLoginMenuItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-        launchAtLoginMenuItem.target = self
-        launchAtLoginMenuItem.state = isLaunchAtLoginEnabled() ? .on : .off
-        menu.addItem(launchAtLoginMenuItem)
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -77,128 +53,74 @@ class StatusBarController {
         }
     }
 
-    private func setupWifiMonitor() {
-        wifiMonitor.startMonitoring()
-        wifiMonitor.onWifiChanged = { [weak self] ssid in
-            self?.handleWifiChange(ssid: ssid)
-        }
-    }
-
-    private func handleWifiChange(ssid: String?) {
-        updateAutoStartMenuItem()
-        if let ssid = ssid, wifiMonitor.autoStartSSIDs.contains(ssid) {
-            startPing()
-        } else if ssid == nil {
-            updateDisplay(latency: nil)
-        }
-    }
-
-    private func updateAutoStartMenuItem() {
-        let ssid = wifiMonitor.currentSSID ?? "No WiFi"
-        autoStartMenuItem.title = "Auto-start on: \(ssid)"
-        autoStartMenuItem.isEnabled = wifiMonitor.currentSSID != nil
-        autoStartMenuItem.state = wifiMonitor.shouldAutoStart() ? .on : .off
-    }
-
     private func updateDisplay(latency: Double?) {
         guard let button = statusItem.button else { return }
 
+        let text: String
+        let color: NSColor
+
         if let ms = latency {
             let rounded = Int(ms.rounded())
-            button.title = "\(rounded)ms"
-            button.contentTintColor = colorForLatency(ms)
+            text = "\(rounded)ms"
+            color = colorForLatency(ms)
         } else {
-            button.title = "---"
-            button.contentTintColor = .gray
+            text = "---"
+            color = .secondaryLabelColor
         }
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .foregroundColor: color,
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        ]
+        button.attributedTitle = NSAttributedString(string: text, attributes: attributes)
     }
 
     private func colorForLatency(_ ms: Double) -> NSColor {
         switch ms {
         case ..<50: return .systemGreen
-        case ..<150: return .systemYellow
+        case ..<150: return .systemOrange
         default: return .systemRed
         }
     }
 
     @objc private func startPing() {
-        isRunning = true
         pingService.start()
         startMenuItem.isEnabled = false
         stopMenuItem.isEnabled = true
     }
 
     @objc private func stopPing() {
-        isRunning = false
         pingService.stop()
         startMenuItem.isEnabled = true
         stopMenuItem.isEnabled = false
-        if let button = statusItem.button {
-            button.title = "---"
-            button.contentTintColor = .gray
-        }
+        updateDisplay(latency: nil)
     }
 
-    @objc private func toggleAutoStart() {
-        if wifiMonitor.shouldAutoStart() {
-            if let ssid = wifiMonitor.currentSSID {
-                wifiMonitor.removeSSIDFromAutoStart(ssid)
-            }
-        } else {
-            wifiMonitor.addCurrentSSIDToAutoStart()
+    @objc private func showSettings() {
+        if let window = settingsWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
         }
-        updateAutoStartMenuItem()
-    }
 
-    @objc private func showManageNetworks() {
-        let alert = NSAlert()
-        alert.messageText = "Auto-start Networks"
-        let ssids = wifiMonitor.autoStartSSIDs
-        if ssids.isEmpty {
-            alert.informativeText = "No networks configured."
-        } else {
-            alert.informativeText = "Networks:\n" + ssids.sorted().joined(separator: "\n")
-        }
-        alert.addButton(withTitle: "OK")
-        if !ssids.isEmpty {
-            alert.addButton(withTitle: "Clear All")
-        }
-        let response = alert.runModal()
-        if response == .alertSecondButtonReturn {
-            wifiMonitor.autoStartSSIDs = []
-            updateAutoStartMenuItem()
-        }
-    }
+        let settingsView = SettingsView()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 100),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "PingBar Settings"
+        window.contentView = NSHostingView(rootView: settingsView)
+        window.center()
+        window.isReleasedWhenClosed = false
+        settingsWindow = window
 
-    @objc private func toggleLaunchAtLogin() {
-        let newState = !isLaunchAtLoginEnabled()
-        setLaunchAtLogin(enabled: newState)
-        launchAtLoginMenuItem.state = newState ? .on : .off
-    }
-
-    private func isLaunchAtLoginEnabled() -> Bool {
-        if #available(macOS 13.0, *) {
-            return SMAppService.mainApp.status == .enabled
-        }
-        return false
-    }
-
-    private func setLaunchAtLogin(enabled: Bool) {
-        if #available(macOS 13.0, *) {
-            do {
-                if enabled {
-                    try SMAppService.mainApp.register()
-                } else {
-                    try SMAppService.mainApp.unregister()
-                }
-            } catch {
-                print("Failed to set launch at login: \(error)")
-            }
-        }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func quit() {
-        wifiMonitor.stopMonitoring()
         pingService.stop()
         NSApp.terminate(nil)
     }
