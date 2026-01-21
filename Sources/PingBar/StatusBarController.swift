@@ -10,7 +10,7 @@ class StatusBarController {
     private var stopMenuItem: NSMenuItem!
 
     init() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: 28)
         setupStatusItem()
         setupMenu()
         setupPingService()
@@ -60,12 +60,16 @@ class StatusBarController {
         let color: NSColor
 
         if let ms = latency {
-            let rounded = Int(ms.rounded())
-            text = "\(rounded)ms"
+            if ms >= 1000 {
+                let seconds = ms / 1000
+                text = String(format: "%.1fs", seconds)
+            } else {
+                text = "\(Int(ms.rounded()))ms"
+            }
             color = colorForLatency(ms)
         } else {
             text = "---"
-            color = .secondaryLabelColor
+            color = .systemRed
         }
 
         let attributes: [NSAttributedString.Key: Any] = [
