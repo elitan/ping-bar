@@ -1,0 +1,40 @@
+{
+  "": {
+    "swift-dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/master.swiftdeps"
+  },
+  "/Users/johan/code/ping-bar/Sources/PingBar/AppDelegate.swift": {
+    "dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/AppDelegate.d",
+    "object": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/AppDelegate.swift.o",
+    "swiftmodule": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/AppDelegate~partial.swiftmodule",
+    "swift-dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/AppDelegate.swiftdeps",
+    "diagnostics": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/AppDelegate.dia"
+  },
+  "/Users/johan/code/ping-bar/Sources/PingBar/PingService.swift": {
+    "dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/PingService.d",
+    "object": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/PingService.swift.o",
+    "swiftmodule": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/PingService~partial.swiftmodule",
+    "swift-dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/PingService.swiftdeps",
+    "diagnostics": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/PingService.dia"
+  },
+  "/Users/johan/code/ping-bar/Sources/PingBar/StatusBarController.swift": {
+    "dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/StatusBarController.d",
+    "object": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/StatusBarController.swift.o",
+    "swiftmodule": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/StatusBarController~partial.swiftmodule",
+    "swift-dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/StatusBarController.swiftdeps",
+    "diagnostics": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/StatusBarController.dia"
+  },
+  "/Users/johan/code/ping-bar/Sources/PingBar/WifiMonitor.swift": {
+    "dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/WifiMonitor.d",
+    "object": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/WifiMonitor.swift.o",
+    "swiftmodule": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/WifiMonitor~partial.swiftmodule",
+    "swift-dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/WifiMonitor.swiftdeps",
+    "diagnostics": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/WifiMonitor.dia"
+  },
+  "/Users/johan/code/ping-bar/Sources/PingBar/main.swift": {
+    "dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/main.d",
+    "object": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/main.swift.o",
+    "swiftmodule": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/main.swiftdeps",
+    "diagnostics": "/Users/johan/code/ping-bar/.build/arm64-apple-macosx/debug/PingBar.build/main.dia"
+  }
+}
