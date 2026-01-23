@@ -10,7 +10,7 @@ class StatusBarController {
     private var stopMenuItem: NSMenuItem!
 
     init() {
-        statusItem = NSStatusBar.system.statusItem(withLength: 20)
+        statusItem = NSStatusBar.system.statusItem(withLength: 45)
         setupStatusItem()
         setupMenu()
         setupPingService()
