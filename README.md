@@ -4,7 +4,9 @@ Network diagnostics in your menu bar. Monitor latency, WiFi signal, and connecti
 
 **[Download Latest Release](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.zip)**
 
-![PingBar Screenshot](assets/pingbar.png)
+<p align="center">
+  <img src="assets/pingbar.png" alt="PingBar Screenshot" width="400">
+</p>
 
 ## Features
 
