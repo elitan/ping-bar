@@ -2,7 +2,7 @@
 
 Network diagnostics in your menu bar. Monitor latency, WiFi signal, and connection quality at a glance.
 
-**[⬇️ Download](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.zip)**
+**[Download Latest Release](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.zip)**
 
 ![PingBar Screenshot](assets/pingbar.png)
 
