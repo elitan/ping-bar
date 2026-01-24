@@ -22,5 +22,9 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>PingBar needs location access to display the WiFi network name (SSID).</string>
+    <key>NSLocationUsageDescription</key>
+    <string>PingBar needs location access to display the WiFi network name (SSID).</string>
 </dict>
 </plist>

@@ -3,74 +3,71 @@ import SwiftUI
 
 class StatusBarController {
     private var statusItem: NSStatusItem
-    private let pingService = PingService()
+    private let diagnosticsService = DiagnosticsService()
     private var settingsWindow: NSWindow?
-
-    private var startMenuItem: NSMenuItem!
-    private var stopMenuItem: NSMenuItem!
+    private var popover: NSPopover!
+    private var viewModel: DiagnosticsViewModel!
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: 45)
         setupStatusItem()
-        setupMenu()
-        setupPingService()
+        setupPopover()
+        setupDiagnosticsService()
     }
 
     private func setupStatusItem() {
         updateDisplay(latency: nil)
+
+        if let button = statusItem.button {
+            button.action = #selector(togglePopover)
+            button.target = self
+        }
     }
 
-    private func setupMenu() {
-        let menu = NSMenu()
+    private func setupPopover() {
+        viewModel = DiagnosticsViewModel(service: diagnosticsService)
 
-        startMenuItem = NSMenuItem(title: "Start", action: #selector(startPing), keyEquivalent: "s")
-        startMenuItem.target = self
-        menu.addItem(startMenuItem)
+        let diagnosticsView = DiagnosticsView(
+            viewModel: viewModel,
+            onSettings: { [weak self] in
+                self?.popover.close()
+                self?.showSettings()
+            },
+            onQuit: { [weak self] in
+                self?.quit()
+            }
+        )
 
-        stopMenuItem = NSMenuItem(title: "Stop", action: #selector(stopPing), keyEquivalent: "x")
-        stopMenuItem.target = self
-        stopMenuItem.isEnabled = false
-        menu.addItem(stopMenuItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
-        settingsItem.target = self
-        menu.addItem(settingsItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
-        quitItem.target = self
-        menu.addItem(quitItem)
-
-        statusItem.menu = menu
+        popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentSize = NSSize(width: 320, height: 440)
+        popover.contentViewController = NSHostingController(rootView: diagnosticsView)
     }
 
-    private func setupPingService() {
-        pingService.onPingResult = { [weak self] latency in
-            self?.updateDisplay(latency: latency)
+    private func setupDiagnosticsService() {
+        diagnosticsService.onUpdate = { [weak self] in
+            guard let self = self else { return }
+            let latency = self.diagnosticsService.isRunning ? self.diagnosticsService.internetHistory.latest : nil
+            self.updateDisplay(latency: latency)
+            self.viewModel.refresh()
         }
     }
 
     private func updateDisplay(latency: Double?) {
         guard let button = statusItem.button else { return }
 
-        let text: String
-        let color: NSColor
-
-        if let ms = latency {
-            if ms >= 1000 {
-                let seconds = ms / 1000
-                text = String(format: "%.1fs", seconds)
-            } else {
-                text = "\(Int(ms.rounded()))ms"
+        let (text, color): (String, NSColor) = {
+            guard diagnosticsService.isRunning else {
+                return ("---", .secondaryLabelColor)
             }
-            color = colorForLatency(ms)
-        } else {
-            text = "---"
-            color = .systemRed
-        }
+            guard let ms = latency else {
+                return ("---", .systemRed)
+            }
+            if ms >= 1000 {
+                return (String(format: "%.1fs", ms / 1000), colorForLatency(ms))
+            }
+            return ("\(Int(ms.rounded()))ms", colorForLatency(ms))
+        }()
 
         let attributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: color,
@@ -81,26 +78,24 @@ class StatusBarController {
 
     private func colorForLatency(_ ms: Double) -> NSColor {
         switch ms {
-        case ..<50: return .systemGreen
-        case ..<150: return .systemOrange
+        case ..<30: return .systemGreen
+        case ..<100: return .systemOrange
         default: return .systemRed
         }
     }
 
-    @objc private func startPing() {
-        pingService.start()
-        startMenuItem.isEnabled = false
-        stopMenuItem.isEnabled = true
+    @objc private func togglePopover() {
+        guard let button = statusItem.button else { return }
+
+        if popover.isShown {
+            popover.close()
+        } else {
+            viewModel.refresh()
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
     }
 
-    @objc private func stopPing() {
-        pingService.stop()
-        startMenuItem.isEnabled = true
-        stopMenuItem.isEnabled = false
-        updateDisplay(latency: nil)
-    }
-
-    @objc private func showSettings() {
+    private func showSettings() {
         if let window = settingsWindow {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -124,8 +119,8 @@ class StatusBarController {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc private func quit() {
-        pingService.stop()
+    private func quit() {
+        diagnosticsService.stop()
         NSApp.terminate(nil)
     }
 }

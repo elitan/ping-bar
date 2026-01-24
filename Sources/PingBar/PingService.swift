@@ -1,34 +1,13 @@
 import Foundation
 
 class PingService {
-    private var timer: Timer?
-    private let target = "google.com"
-    var onPingResult: ((Double?) -> Void)?
+    private let target: String
 
-    func start() {
-        stop()
-        ping()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.ping()
-        }
+    init(target: String = "google.com") {
+        self.target = target
     }
 
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    private func ping() {
-        DispatchQueue.global(qos: .background).async { [weak self] in
-            guard let self = self else { return }
-            let latency = self.executePing()
-            DispatchQueue.main.async {
-                self.onPingResult?(latency)
-            }
-        }
-    }
-
-    private func executePing() -> Double? {
+    func executePing() -> Double? {
         let process = Process()
         let pipe = Pipe()
 

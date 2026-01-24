@@ -11,13 +11,65 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          security import $CERTIFICATE_PATH -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
       - name: Build app bundle
         run: ./scripts/build-app.sh
 
-      - name: Create zip
+      - name: Sign app
+        env:
+          DEVELOPER_ID: "Developer ID Application: Johan Eliasson (J2Z78W23W7)"
+        run: |
+          codesign --force --options runtime \
+            --entitlements Resources/PingBar.entitlements \
+            --sign "$DEVELOPER_ID" \
+            --timestamp \
+            .build/release/PingBar.app
+
+          codesign --verify --verbose .build/release/PingBar.app
+
+      - name: Create zip for notarization
         run: |
           cd .build/release
-          zip -r PingBar.zip PingBar.app
+          ditto -c -k --keepParent PingBar.app PingBar.zip
+
+      - name: Notarize app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          TEAM_ID: "J2Z78W23W7"
+        run: |
+          xcrun notarytool submit .build/release/PingBar.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$TEAM_ID" \
+            --wait
+
+      - name: Staple app
+        run: xcrun stapler staple .build/release/PingBar.app
+
+      - name: Re-create zip with stapled app
+        run: |
+          cd .build/release
+          rm PingBar.zip
+          ditto -c -k --keepParent PingBar.app PingBar.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
