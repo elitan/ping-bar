@@ -1,22 +1,27 @@
 # PingBar
 
-A simple macOS menu bar app that shows your ping latency to google.com.
+A macOS menu bar app for network diagnostics - monitor ping latency, WiFi signal, and connection quality at a glance.
 
-![Menu Bar](https://img.shields.io/badge/macOS-13%2B-blue)
+![macOS](https://img.shields.io/badge/macOS-13%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+**[⬇️ Download Latest Release](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.zip)**
 
 ## Features
 
-- Shows ping latency in menu bar (e.g., `12ms`)
-- Color coded: green (<50ms), orange (<150ms), red (>150ms)
-- Start/Stop ping monitoring
-- Launch at Login option
-- Lightweight, native Swift app
+- **Menu bar latency** - Shows ping to internet (1.1.1.1) with color coding
+- **WiFi info** - SSID, signal strength, noise, link rate, band (2.4/5 GHz)
+- **Router ping** - Latency to your gateway with sparkline graph
+- **Internet ping** - Latency to 1.1.1.1 with jitter and packet loss
+- **DNS lookup** - Resolution time for cloudflare.com
+- **Captive portal detection** - Alerts when login is required
+- **Signed & notarized** - Runs without Gatekeeper warnings
 
 ## Install
 
 ### Download (Recommended)
 
-1. Download `PingBar.zip` from [Releases](https://github.com/elitan/ping-bar/releases)
+1. Download [PingBar.zip](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.zip)
 2. Unzip and drag `PingBar.app` to `/Applications`
 3. Open PingBar from Applications
 
@@ -32,14 +37,22 @@ App bundle will be at `.build/release/PingBar.app`
 
 ## Usage
 
-1. Click the menu bar item (`---` initially)
-2. Click **Start** to begin pinging
-3. Watch latency update every second
-4. Click **Stop** to pause
+1. Click the menu bar item to open the diagnostics panel
+2. Click **Start** to begin monitoring
+3. View real-time stats with sparkline graphs
+4. Click **Stop** to pause and clear
+
+## Color Coding
+
+| Metric | Green | Orange | Red |
+|--------|-------|--------|-----|
+| Ping | <30ms | <100ms | ≥100ms |
+| Signal | >-50dBm | >-70dBm | ≤-70dBm |
+| Loss | 0% | <5% | ≥5% |
 
 ## Settings
 
-- **Launch at Login**: Start PingBar automatically when you log in
+- **Launch at Login** - Start PingBar automatically when you log in
 
 ## License
 
