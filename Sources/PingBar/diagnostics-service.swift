@@ -17,6 +17,7 @@ class DiagnosticsService {
     private var captivePortalTimer: Timer?
     private(set) var isRunning = false
     private(set) var gatewayIP: String?
+    private(set) var dnsServerIP: String?
     private var currentSSID: String?
     private(set) var captivePortalStatus: CaptivePortalStatus = .unknown
 
@@ -105,6 +106,7 @@ class DiagnosticsService {
 
     private func refreshGateway() {
         gatewayIP = detectGateway()
+        dnsServerIP = detectDNSServer()
         if let gateway = gatewayIP {
             routerPingService = PingService(target: gateway)
         } else {
@@ -114,11 +116,62 @@ class DiagnosticsService {
     }
 
     private func detectGateway() -> String? {
+        runCommand("/sbin/route", args: ["-n", "get", "default"], linePrefix: "gateway:")
+    }
+
+    private func detectDNSServer() -> String? {
         let process = Process()
         let pipe = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: "/sbin/route")
-        process.arguments = ["-n", "get", "default"]
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/scutil")
+        process.arguments = ["--dns"]
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8) else { return nil }
+
+        var currentNameserver: String?
+        var isSupplemental = false
+
+        for line in output.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed.hasPrefix("resolver #") {
+                if let ns = currentNameserver, !isSupplemental {
+                    return ns
+                }
+                currentNameserver = nil
+                isSupplemental = false
+            } else if trimmed.hasPrefix("nameserver[0]") {
+                let parts = trimmed.components(separatedBy: ":")
+                if parts.count >= 2 {
+                    currentNameserver = parts[1].trimmingCharacters(in: .whitespaces)
+                }
+            } else if trimmed.hasPrefix("flags") && trimmed.contains("Supplemental") {
+                isSupplemental = true
+            }
+        }
+
+        if let ns = currentNameserver, !isSupplemental {
+            return ns
+        }
+        return nil
+    }
+
+    private func runCommand(_ path: String, args: [String], linePrefix: String) -> String? {
+        let process = Process()
+        let pipe = Pipe()
+
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = args
         process.standardOutput = pipe
         process.standardError = pipe
 
@@ -134,7 +187,7 @@ class DiagnosticsService {
 
         for line in output.components(separatedBy: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("gateway:") {
+            if trimmed.hasPrefix(linePrefix) {
                 return trimmed.components(separatedBy: ":").dropFirst().joined(separator: ":").trimmingCharacters(in: .whitespaces)
             }
         }
@@ -145,5 +198,6 @@ class DiagnosticsService {
         routerHistory.clear()
         internetHistory.clear()
         dnsHistory.clear()
+        dnsServerIP = nil
     }
 }
