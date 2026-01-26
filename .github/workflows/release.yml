@@ -11,6 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: brew install create-dmg imagemagick
+
       - name: Install certificate
         env:
           CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
@@ -45,40 +48,54 @@ jobs:
 
           codesign --verify --verbose .build/release/PingBar.app
 
-      - name: Create zip for notarization
+      - name: Generate DMG background
         run: |
-          cd .build/release
-          ditto -c -k --keepParent PingBar.app PingBar.zip
+          magick -size 660x400 xc:'#f5f5f7' \
+            -fill '#86868b' -font Helvetica -pointsize 14 \
+            -gravity south -annotate +0+20 'Drag PingBar to Applications to install' \
+            -fill '#86868b' -stroke '#86868b' -strokewidth 2 \
+            -draw "line 290,170 370,170" \
+            -draw "line 355,155 370,170" \
+            -draw "line 355,185 370,170" \
+            .build/release/dmg-background.png
 
-      - name: Notarize app
+      - name: Create DMG
+        env:
+          CODESIGN_IDENTITY: "Developer ID Application: Johan Eliasson (J2Z78W23W7)"
+        run: |
+          ./scripts/create-dmg.sh \
+            .build/release/PingBar.app \
+            .build/release/PingBar.dmg \
+            .build/release/dmg-background.png
+
+      - name: Notarize DMG
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           TEAM_ID: "J2Z78W23W7"
         run: |
-          xcrun notarytool submit .build/release/PingBar.zip \
+          xcrun notarytool submit .build/release/PingBar.dmg \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$TEAM_ID" \
             --wait
 
-      - name: Staple app
-        run: xcrun stapler staple .build/release/PingBar.app
+      - name: Staple DMG
+        run: xcrun stapler staple .build/release/PingBar.dmg
 
-      - name: Re-create zip with stapled app
+      - name: Verify DMG
         run: |
-          cd .build/release
-          rm PingBar.zip
-          ditto -c -k --keepParent PingBar.app PingBar.zip
+          spctl -a -t open --context context:primary-signature -v .build/release/PingBar.dmg
+          echo "DMG verification passed"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: PingBar
-          path: .build/release/PingBar.zip
+          path: .build/release/PingBar.dmg
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: .build/release/PingBar.zip
+          files: .build/release/PingBar.dmg
           generate_release_notes: true
