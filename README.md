@@ -2,7 +2,7 @@
 
 Network diagnostics in your menu bar. Monitor latency, WiFi signal, and connection quality at a glance.
 
-**[Download Latest Release](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.zip)**
+**[Download Latest Release](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.dmg)**
 
 <p align="center">
   <img src="assets/pingbar.png" alt="PingBar Screenshot" width="400">
@@ -20,8 +20,8 @@ Network diagnostics in your menu bar. Monitor latency, WiFi signal, and connecti
 
 ## Install
 
-1. Download [PingBar.zip](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.zip)
-2. Unzip and move `PingBar.app` to Applications
+1. Download [PingBar.dmg](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.dmg)
+2. Open the DMG and drag PingBar to Applications
 3. Open PingBar
 
 ### Build from source
