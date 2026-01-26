@@ -17,6 +17,7 @@ class DiagnosticsService {
     private var captivePortalTimer: Timer?
     private(set) var isRunning = false
     private(set) var gatewayIP: String?
+    private var currentSSID: String?
     private(set) var captivePortalStatus: CaptivePortalStatus = .unknown
 
     var onUpdate: (() -> Void)?
@@ -31,11 +32,8 @@ class DiagnosticsService {
         guard !isRunning else { return }
         isRunning = true
 
-        gatewayIP = detectGateway()
-
-        if let gateway = gatewayIP {
-            routerPingService = PingService(target: gateway)
-        }
+        currentSSID = wifiService.getCurrentInfo()?.ssid
+        refreshGateway()
         internetPingService = PingService(target: "1.1.1.1")
 
         checkCaptivePortal()
@@ -81,6 +79,14 @@ class DiagnosticsService {
     }
 
     private func tick() {
+        let newSSID = wifiService.getCurrentInfo()?.ssid
+        if newSSID != currentSSID {
+            currentSSID = newSSID
+            DispatchQueue.main.async {
+                self.refreshGateway()
+            }
+        }
+
         DispatchQueue.global(qos: .background).async { [weak self] in
             guard let self = self else { return }
 
@@ -95,6 +101,16 @@ class DiagnosticsService {
                 self.onUpdate?()
             }
         }
+    }
+
+    private func refreshGateway() {
+        gatewayIP = detectGateway()
+        if let gateway = gatewayIP {
+            routerPingService = PingService(target: gateway)
+        } else {
+            routerPingService = nil
+        }
+        routerHistory.clear()
     }
 
     private func detectGateway() -> String? {
