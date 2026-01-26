@@ -13,6 +13,7 @@ class DiagnosticsViewModel: ObservableObject {
     @Published var dnsHistory: [Double?] = []
     @Published var isRunning: Bool = false
     @Published var gatewayIP: String?
+    @Published var dnsServerIP: String?
     @Published var captivePortalStatus: CaptivePortalStatus = .unknown
 
     init(service: DiagnosticsService) {
@@ -32,6 +33,7 @@ class DiagnosticsViewModel: ObservableObject {
         dnsHistory = service.dnsHistory.values
         isRunning = service.isRunning
         gatewayIP = service.gatewayIP
+        dnsServerIP = service.dnsServerIP
         captivePortalStatus = service.captivePortalStatus
     }
 

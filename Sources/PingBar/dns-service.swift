@@ -3,7 +3,7 @@ import Foundation
 class DNSService {
     private let hostname: String
 
-    init(hostname: String = "cloudflare.com") {
+    init(hostname: String = "google.com") {
         self.hostname = hostname
     }
 

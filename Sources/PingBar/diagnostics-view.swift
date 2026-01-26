@@ -158,7 +158,7 @@ struct DiagnosticsView: View {
             HStack {
                 sectionHeader("DNS")
                 Spacer()
-                Text("cloudflare.com")
+                Text(viewModel.dnsServerIP ?? "---")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.secondary)
             }
