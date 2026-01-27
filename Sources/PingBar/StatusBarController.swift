@@ -7,12 +7,23 @@ class StatusBarController {
     private var settingsWindow: NSWindow?
     private var popover: NSPopover!
     private var viewModel: DiagnosticsViewModel!
+    private var displayModeObserver: NSObjectProtocol?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: 45)
         setupStatusItem()
         setupPopover()
         setupDiagnosticsService()
+
+        displayModeObserver = NotificationCenter.default.addObserver(
+            forName: .displayModeChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            let latency = self.diagnosticsService.isRunning ? self.diagnosticsService.internetHistory.latest : nil
+            let smoothed = self.diagnosticsService.isRunning ? self.diagnosticsService.internetHistory.recentWeightedAverage : nil
+            self.updateDisplay(latency: latency, smoothedLatency: smoothed)
+        }
+
         viewModel.start()
     }
 
@@ -70,11 +81,32 @@ class StatusBarController {
             return ("\(Int(ms.rounded()))ms", latencyColor(smoothedLatency))
         }()
 
-        let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: color,
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        ]
-        button.attributedTitle = NSAttributedString(string: text, attributes: attributes)
+        let iconMode = UserDefaults.standard.bool(forKey: "showIconMode")
+
+        if iconMode {
+            statusItem.length = NSStatusItem.squareLength
+            button.attributedTitle = NSAttributedString()
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            if let base = NSImage(systemSymbolName: "wifi", accessibilityDescription: "Ping status"),
+               let configured = base.withSymbolConfiguration(config) {
+                let coloredImage = NSImage(size: configured.size, flipped: false) { rect in
+                    configured.draw(in: rect)
+                    color.set()
+                    rect.fill(using: .sourceAtop)
+                    return true
+                }
+                coloredImage.isTemplate = false
+                button.image = coloredImage
+            }
+        } else {
+            statusItem.length = 45
+            button.image = nil
+            let attributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: color,
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+            ]
+            button.attributedTitle = NSAttributedString(string: text, attributes: attributes)
+        }
     }
 
     @objc private func togglePopover() {

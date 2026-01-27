@@ -10,6 +10,11 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
+                Toggle("Show Icon Instead of Ping Time", isOn: Binding(
+                    get: { viewModel.showIconMode },
+                    set: { viewModel.setShowIconMode($0) }
+                ))
+
                 Toggle("Launch at Login", isOn: Binding(
                     get: { viewModel.launchAtLogin },
                     set: { viewModel.setLaunchAtLogin($0) }
@@ -72,6 +77,7 @@ class SettingsViewModel: ObservableObject {
     @Published var pingInterval: Double = 1.0
     @Published var internetTarget: String = ""
     @Published var dnsHostname: String = ""
+    @Published var showIconMode: Bool = false
 
     init() {
         if #available(macOS 13.0, *) {
@@ -82,6 +88,7 @@ class SettingsViewModel: ObservableObject {
 
         internetTarget = UserDefaults.standard.string(forKey: "internetTarget") ?? ""
         dnsHostname = UserDefaults.standard.string(forKey: "dnsHostname") ?? ""
+        showIconMode = UserDefaults.standard.bool(forKey: "showIconMode")
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -115,5 +122,11 @@ class SettingsViewModel: ObservableObject {
         dnsHostname = value
         UserDefaults.standard.set(value, forKey: "dnsHostname")
         NotificationCenter.default.post(name: .pingTargetsChanged, object: nil)
+    }
+
+    func setShowIconMode(_ enabled: Bool) {
+        showIconMode = enabled
+        UserDefaults.standard.set(enabled, forKey: "showIconMode")
+        NotificationCenter.default.post(name: .displayModeChanged, object: nil)
     }
 }
