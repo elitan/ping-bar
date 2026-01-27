@@ -30,7 +30,6 @@ class StatusBarController {
         let diagnosticsView = DiagnosticsView(
             viewModel: viewModel,
             onSettings: { [weak self] in
-                self?.popover.close()
                 self?.showSettings()
             },
             onQuit: { [weak self] in
@@ -88,25 +87,37 @@ class StatusBarController {
         }
     }
 
+    private var settingsCloseObserver: NSObjectProtocol?
+
     private func showSettings() {
+        popover.behavior = .applicationDefined
+
         if let window = settingsWindow {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
 
-        let settingsView = SettingsView()
+        let hostingView = NSHostingView(rootView: SettingsView())
+        hostingView.setFrameSize(hostingView.fittingSize)
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 160),
+            contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = "PingBar Settings"
-        window.contentView = NSHostingView(rootView: settingsView)
+        window.contentView = hostingView
         window.center()
         window.isReleasedWhenClosed = false
         settingsWindow = window
+
+        settingsCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: window, queue: .main
+        ) { [weak self] _ in
+            self?.popover.behavior = .transient
+        }
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

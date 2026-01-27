@@ -78,7 +78,9 @@ struct DiagnosticsView: View {
             Text("This network requires login. Open a browser to authenticate.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
-            Button(action: { viewModel.openCaptivePortalLogin() }) {
+            Button {
+                viewModel.openCaptivePortalLogin()
+            } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.up.forward.square")
                     Text("Open Login Page")
@@ -137,7 +139,7 @@ struct DiagnosticsView: View {
             HStack {
                 sectionHeader("Internet")
                 Spacer()
-                Text("1.1.1.1")
+                Text(viewModel.internetTargetLabel)
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.secondary)
             }
