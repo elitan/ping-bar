@@ -138,6 +138,10 @@ class DiagnosticsService {
             DispatchQueue.main.async {
                 self.refreshGateway()
             }
+        } else if newSSID != nil && gatewayIP == nil {
+            DispatchQueue.main.async {
+                self.refreshGateway()
+            }
         }
 
         DispatchQueue.global(qos: .background).async { [weak self] in
