@@ -13,6 +13,7 @@ class StatusBarController {
         setupStatusItem()
         setupPopover()
         setupDiagnosticsService()
+        viewModel.start()
     }
 
     private func setupStatusItem() {
