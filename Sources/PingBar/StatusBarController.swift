@@ -16,7 +16,7 @@ class StatusBarController {
     }
 
     private func setupStatusItem() {
-        updateDisplay(latency: nil)
+        updateDisplay(latency: nil, smoothedLatency: nil)
 
         if let button = statusItem.button {
             button.action = #selector(togglePopover)
@@ -48,12 +48,13 @@ class StatusBarController {
         diagnosticsService.onUpdate = { [weak self] in
             guard let self = self else { return }
             let latency = self.diagnosticsService.isRunning ? self.diagnosticsService.internetHistory.latest : nil
-            self.updateDisplay(latency: latency)
+            let smoothed = self.diagnosticsService.isRunning ? self.diagnosticsService.internetHistory.recentWeightedAverage : nil
+            self.updateDisplay(latency: latency, smoothedLatency: smoothed)
             self.viewModel.refresh()
         }
     }
 
-    private func updateDisplay(latency: Double?) {
+    private func updateDisplay(latency: Double?, smoothedLatency: Double?) {
         guard let button = statusItem.button else { return }
 
         let (text, color): (String, NSColor) = {
@@ -64,9 +65,9 @@ class StatusBarController {
                 return ("---", .systemRed)
             }
             if ms >= 1000 {
-                return (String(format: "%.1fs", ms / 1000), colorForLatency(ms))
+                return (String(format: "%.1fs", ms / 1000), latencyColor(smoothedLatency))
             }
-            return ("\(Int(ms.rounded()))ms", colorForLatency(ms))
+            return ("\(Int(ms.rounded()))ms", latencyColor(smoothedLatency))
         }()
 
         let attributes: [NSAttributedString.Key: Any] = [
@@ -74,14 +75,6 @@ class StatusBarController {
             .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         ]
         button.attributedTitle = NSAttributedString(string: text, attributes: attributes)
-    }
-
-    private func colorForLatency(_ ms: Double) -> NSColor {
-        switch ms {
-        case ..<30: return .systemGreen
-        case ..<100: return .systemOrange
-        default: return .systemRed
-        }
     }
 
     @objc private func togglePopover() {

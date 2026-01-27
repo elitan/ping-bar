@@ -122,7 +122,7 @@ struct DiagnosticsView: View {
             MetricRowView(
                 label: "Latency",
                 value: formatLatency(viewModel.routerLatency),
-                color: viewModel.colorForPing(viewModel.routerLatency),
+                color: viewModel.colorForPing(viewModel.routerLatency, smoothed: viewModel.routerSmoothed),
                 history: viewModel.routerHistory,
                 subtitle: formatJitter(viewModel.routerJitter)
             )
@@ -144,7 +144,7 @@ struct DiagnosticsView: View {
             MetricRowView(
                 label: "Latency",
                 value: formatLatency(viewModel.internetLatency),
-                color: viewModel.colorForPing(viewModel.internetLatency),
+                color: viewModel.colorForPing(viewModel.internetLatency, smoothed: viewModel.internetSmoothed),
                 history: viewModel.internetHistory,
                 subtitle: formatJitter(viewModel.internetJitter)
             )
@@ -166,7 +166,7 @@ struct DiagnosticsView: View {
             MetricRowView(
                 label: "Lookup",
                 value: formatLatency(viewModel.dnsLatency),
-                color: viewModel.colorForPing(viewModel.dnsLatency),
+                color: viewModel.colorForPing(viewModel.dnsLatency, smoothed: viewModel.dnsSmoothed),
                 history: viewModel.dnsHistory
             )
         }

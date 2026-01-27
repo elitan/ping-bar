@@ -55,6 +55,23 @@ class MetricHistory {
         return Double(nilCount) / Double(total) * 100
     }
 
+    var recentWeightedAverage: Double? {
+        let window = 10
+        let alpha = 0.2
+        let vals = values
+        let recent = vals.suffix(window)
+        var ewma: Double?
+        for sample in recent {
+            guard let s = sample else { continue }
+            if let prev = ewma {
+                ewma = alpha * s + (1.0 - alpha) * prev
+            } else {
+                ewma = s
+            }
+        }
+        return ewma
+    }
+
     func clear() {
         buffer = Array(repeating: nil, count: capacity)
         index = 0

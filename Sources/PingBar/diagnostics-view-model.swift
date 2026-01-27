@@ -8,6 +8,9 @@ class DiagnosticsViewModel: ObservableObject {
     @Published var routerLatency: Double?
     @Published var internetLatency: Double?
     @Published var dnsLatency: Double?
+    @Published var routerSmoothed: Double?
+    @Published var internetSmoothed: Double?
+    @Published var dnsSmoothed: Double?
     @Published var routerHistory: [Double?] = []
     @Published var internetHistory: [Double?] = []
     @Published var dnsHistory: [Double?] = []
@@ -28,6 +31,9 @@ class DiagnosticsViewModel: ObservableObject {
         routerLatency = service.routerHistory.latest
         internetLatency = service.internetHistory.latest
         dnsLatency = service.dnsHistory.latest
+        routerSmoothed = service.routerHistory.recentWeightedAverage
+        internetSmoothed = service.internetHistory.recentWeightedAverage
+        dnsSmoothed = service.dnsHistory.recentWeightedAverage
         routerHistory = service.routerHistory.values
         internetHistory = service.internetHistory.values
         dnsHistory = service.dnsHistory.values
@@ -76,13 +82,8 @@ class DiagnosticsViewModel: ObservableObject {
         return true
     }
 
-    func colorForPing(_ ms: Double?) -> Color {
-        guard let ms = ms else { return .red }
-        switch ms {
-        case ..<30: return .green
-        case ..<100: return .orange
-        default: return .red
-        }
+    func colorForPing(_ ms: Double?, smoothed: Double? = nil) -> Color {
+        return latencySwiftUIColor(smoothed ?? ms)
     }
 
     func colorForSignal(_ rssi: Int) -> Color {
