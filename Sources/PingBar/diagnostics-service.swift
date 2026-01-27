@@ -22,10 +22,37 @@ class DiagnosticsService {
     private(set) var captivePortalStatus: CaptivePortalStatus = .unknown
 
     var onUpdate: (() -> Void)?
+    private var intervalObserver: NSObjectProtocol?
 
     init() {
         locationManager.onAuthorizationChanged = { [weak self] _ in
             self?.onUpdate?()
+        }
+        intervalObserver = NotificationCenter.default.addObserver(
+            forName: Notification.Name("pingIntervalChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.restartTimer()
+        }
+    }
+
+    deinit {
+        if let observer = intervalObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    private var pingInterval: TimeInterval {
+        let stored = UserDefaults.standard.double(forKey: "pingInterval")
+        return stored > 0 ? stored : 1.0
+    }
+
+    private func restartTimer() {
+        guard isRunning else { return }
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: pingInterval, repeats: true) { [weak self] _ in
+            self?.tick()
         }
     }
 
@@ -39,7 +66,7 @@ class DiagnosticsService {
 
         checkCaptivePortal()
         tick()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: pingInterval, repeats: true) { [weak self] _ in
             self?.tick()
         }
         captivePortalTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
