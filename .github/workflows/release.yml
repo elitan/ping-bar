@@ -99,3 +99,22 @@ jobs:
         with:
           files: .build/release/PingBar.dmg
           generate_release_notes: true
+
+      - name: Update Homebrew tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          SHA256=$(shasum -a 256 .build/release/PingBar.dmg | awk '{print $1}')
+
+          git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/elitan/homebrew-tap.git /tmp/homebrew-tap
+          cd /tmp/homebrew-tap
+
+          sed -i '' "s/version \".*\"/version \"${VERSION}\"/" Casks/pingbar.rb
+          sed -i '' "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Casks/pingbar.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/pingbar.rb
+          git commit -m "Update PingBar to v${VERSION}"
+          git push

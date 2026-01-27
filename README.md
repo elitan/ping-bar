@@ -20,6 +20,14 @@ Network diagnostics in your menu bar. Monitor latency, WiFi signal, and connecti
 
 ## Install
 
+### Homebrew
+
+```bash
+brew install --cask elitan/tap/pingbar
+```
+
+### Manual
+
 1. Download [PingBar.dmg](https://github.com/elitan/ping-bar/releases/latest/download/PingBar.dmg)
 2. Open the DMG and drag PingBar to Applications
 3. Open PingBar
