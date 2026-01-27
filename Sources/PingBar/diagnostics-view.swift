@@ -42,7 +42,7 @@ struct DiagnosticsView: View {
                         .controlSize(.small)
                     }
                     Spacer()
-                    Text(wifi.band)
+                    Text("\(wifi.wifiStandard) · \(wifi.band)")
                         .font(.system(size: 10))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)

@@ -7,6 +7,7 @@ struct WiFiInfo {
     let noise: Int
     let channel: Int
     let band: String
+    let wifiStandard: String
     let linkRate: Double
 
     var signalQuality: Int {
@@ -26,8 +27,17 @@ class WiFiService {
         let band: String
         switch channel {
         case 1...14: band = "2.4 GHz"
-        case 36...: band = "5 GHz"
-        default: band = "Unknown"
+        case 33...177: band = "5 GHz"
+        default: band = "6 GHz"
+        }
+
+        let wifiStandard: String
+        switch interface.activePHYMode() {
+        case .mode11a, .mode11b, .mode11g: wifiStandard = "Wi-Fi"
+        case .mode11n: wifiStandard = "Wi-Fi 4"
+        case .mode11ac: wifiStandard = "Wi-Fi 5"
+        case .mode11ax: wifiStandard = "Wi-Fi 6"
+        default: wifiStandard = "Wi-Fi"
         }
 
         return WiFiInfo(
@@ -36,6 +46,7 @@ class WiFiService {
             noise: interface.noiseMeasurement(),
             channel: channel,
             band: band,
+            wifiStandard: wifiStandard,
             linkRate: interface.transmitRate()
         )
     }
