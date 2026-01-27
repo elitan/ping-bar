@@ -19,6 +19,7 @@ struct DiagnosticsView: View {
         }
         .padding(16)
         .frame(width: 320)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private var wifiSection: some View {
