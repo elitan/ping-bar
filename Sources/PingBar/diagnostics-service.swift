@@ -2,7 +2,7 @@ import Foundation
 
 class DiagnosticsService {
     let wifiService = WiFiService()
-    let dnsService = DNSService()
+    private(set) var dnsService: DNSService
     let captivePortalService = CaptivePortalService()
     let locationManager = LocationManager()
 
@@ -23,29 +23,54 @@ class DiagnosticsService {
 
     var onUpdate: (() -> Void)?
     private var intervalObserver: NSObjectProtocol?
+    private var targetsObserver: NSObjectProtocol?
+
+    var internetTarget: String {
+        let stored = UserDefaults.standard.string(forKey: "internetTarget") ?? ""
+        return stored.isEmpty ? Defaults.internetTarget : stored
+    }
+
+    var dnsHostname: String {
+        let stored = UserDefaults.standard.string(forKey: "dnsHostname") ?? ""
+        return stored.isEmpty ? Defaults.dnsHostname : stored
+    }
 
     init() {
+        let hostname = UserDefaults.standard.string(forKey: "dnsHostname") ?? ""
+        dnsService = DNSService(hostname: hostname.isEmpty ? Defaults.dnsHostname : hostname)
+
         locationManager.onAuthorizationChanged = { [weak self] _ in
             self?.onUpdate?()
         }
         intervalObserver = NotificationCenter.default.addObserver(
-            forName: Notification.Name("pingIntervalChanged"),
-            object: nil,
-            queue: .main
+            forName: .pingIntervalChanged, object: nil, queue: .main
         ) { [weak self] _ in
             self?.restartTimer()
+        }
+        targetsObserver = NotificationCenter.default.addObserver(
+            forName: .pingTargetsChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.restartTargets()
         }
     }
 
     deinit {
-        if let observer = intervalObserver {
-            NotificationCenter.default.removeObserver(observer)
+        [intervalObserver, targetsObserver].compactMap { $0 }.forEach {
+            NotificationCenter.default.removeObserver($0)
         }
+    }
+
+    private func restartTargets() {
+        internetPingService = PingService(target: internetTarget)
+        dnsService = DNSService(hostname: dnsHostname)
+        internetHistory.clear()
+        dnsHistory.clear()
+        onUpdate?()
     }
 
     private var pingInterval: TimeInterval {
         let stored = UserDefaults.standard.double(forKey: "pingInterval")
-        return stored > 0 ? stored : 1.0
+        return stored > 0 ? stored : Defaults.pingInterval
     }
 
     private func restartTimer() {
@@ -62,7 +87,7 @@ class DiagnosticsService {
 
         currentSSID = wifiService.getCurrentInfo()?.ssid
         refreshGateway()
-        internetPingService = PingService(target: "1.1.1.1")
+        internetPingService = PingService(target: internetTarget)
 
         checkCaptivePortal()
         tick()
@@ -134,11 +159,7 @@ class DiagnosticsService {
     private func refreshGateway() {
         gatewayIP = detectGateway()
         dnsServerIP = detectDNSServer()
-        if let gateway = gatewayIP {
-            routerPingService = PingService(target: gateway)
-        } else {
-            routerPingService = nil
-        }
+        routerPingService = gatewayIP.map { PingService(target: $0) }
         routerHistory.clear()
     }
 

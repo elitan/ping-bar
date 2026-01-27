@@ -17,6 +17,8 @@ class DiagnosticsViewModel: ObservableObject {
     @Published var isRunning: Bool = false
     @Published var gatewayIP: String?
     @Published var dnsServerIP: String?
+    @Published var internetTargetLabel: String = Defaults.internetTarget
+    @Published var dnsHostnameLabel: String = Defaults.dnsHostname
     @Published var captivePortalStatus: CaptivePortalStatus = .unknown
 
     init(service: DiagnosticsService) {
@@ -40,6 +42,8 @@ class DiagnosticsViewModel: ObservableObject {
         isRunning = service.isRunning
         gatewayIP = service.gatewayIP
         dnsServerIP = service.dnsServerIP
+        internetTargetLabel = service.internetTarget
+        dnsHostnameLabel = service.dnsHostname
         captivePortalStatus = service.captivePortalStatus
     }
 
@@ -78,12 +82,12 @@ class DiagnosticsViewModel: ObservableObject {
     }
 
     var isCaptivePortal: Bool {
-        guard case .captivePortal = captivePortalStatus else { return false }
-        return true
+        if case .captivePortal = captivePortalStatus { return true }
+        return false
     }
 
     func colorForPing(_ ms: Double?, smoothed: Double? = nil) -> Color {
-        return latencySwiftUIColor(smoothed ?? ms)
+        latencySwiftUIColor(smoothed ?? ms)
     }
 
     func colorForSignal(_ rssi: Int) -> Color {
