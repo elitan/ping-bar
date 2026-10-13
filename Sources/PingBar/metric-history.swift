@@ -1,80 +1,38 @@
 import Foundation
 
-class MetricHistory {
-    private var buffer: [Double?]
-    private var index = 0
-    private var isFull = false
-    let capacity: Int
+/// The last 60 samples of one metric; nil samples are failed probes.
+struct MetricHistory: Equatable {
+    static let capacity = 60
 
-    init(capacity: Int = 60) {
-        self.capacity = capacity
-        self.buffer = Array(repeating: nil, count: capacity)
+    private(set) var values: [Double?] = []
+
+    mutating func add(_ value: Double?) {
+        values.append(value)
+        if values.count > Self.capacity { values.removeFirst() }
     }
 
-    func add(_ value: Double?) {
-        buffer[index] = value
-        index = (index + 1) % capacity
-        if index == 0 { isFull = true }
-    }
-
-    var values: [Double?] {
-        if isFull {
-            return Array(buffer[index...]) + Array(buffer[..<index])
-        } else {
-            return Array(buffer[..<index])
-        }
-    }
-
-    var nonNilValues: [Double] {
-        values.compactMap { $0 }
-    }
-
-    var latest: Double? {
-        if index == 0 && !isFull { return nil }
-        let lastIndex = index == 0 ? capacity - 1 : index - 1
-        return buffer[lastIndex]
-    }
-
-    var average: Double? {
-        let vals = nonNilValues
-        guard !vals.isEmpty else { return nil }
-        return vals.reduce(0, +) / Double(vals.count)
-    }
-
-    var jitter: Double? {
-        let vals = nonNilValues
-        guard vals.count > 1, let avg = average else { return nil }
-        let deviations = vals.map { abs($0 - avg) }
-        return deviations.reduce(0, +) / Double(deviations.count)
-    }
+    var latest: Double? { values.last ?? nil }
 
     var lossPercentage: Double {
-        let total = isFull ? capacity : index
-        guard total > 0 else { return 0 }
-        let nilCount = values.filter { $0 == nil }.count
-        return Double(nilCount) / Double(total) * 100
+        guard !values.isEmpty else { return 0 }
+        return Double(values.filter { $0 == nil }.count) / Double(values.count) * 100
     }
 
-    var recentWeightedAverage: Double? {
-        let window = 10
-        let alpha = 0.2
-        let vals = values
-        let recent = vals.suffix(window)
-        var ewma: Double?
-        for sample in recent {
-            guard let s = sample else { continue }
-            if let prev = ewma {
-                ewma = alpha * s + (1.0 - alpha) * prev
-            } else {
-                ewma = s
-            }
+    /// Mean difference between consecutive successful samples (RFC 3550-style jitter).
+    var jitter: Double? {
+        let differences = zip(values, values.dropFirst()).compactMap { previous, current -> Double? in
+            guard let previous, let current else { return nil }
+            return abs(current - previous)
         }
-        return ewma
+        guard !differences.isEmpty else { return nil }
+        return differences.reduce(0, +) / Double(differences.count)
     }
 
-    func clear() {
-        buffer = Array(repeating: nil, count: capacity)
-        index = 0
-        isFull = false
+    /// Exponentially weighted average of the last 10 samples, so colors don't flicker on single spikes.
+    var smoothed: Double? {
+        let alpha = 0.2
+        return values.suffix(10).compactMap { $0 }.reduce(nil as Double?) { average, sample in
+            average.map { alpha * sample + (1 - alpha) * $0 } ?? sample
+        }
     }
 }

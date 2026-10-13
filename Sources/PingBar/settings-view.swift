@@ -2,143 +2,71 @@ import SwiftUI
 import ServiceManagement
 
 struct SettingsView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    @AppStorage(SettingsKey.showIconMode) private var showIconMode = false
+    @AppStorage(SettingsKey.pingInterval) private var pingInterval = 1.0
+    @AppStorage(SettingsKey.internetTarget) private var internetTarget = AppSettings.defaultInternetTarget
+    @AppStorage(SettingsKey.dnsHostname) private var dnsHostname = AppSettings.defaultDNSHostname
+    @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     @State private var internetTargetDraft: String = ""
     @State private var dnsHostnameDraft: String = ""
-    @State private var targetsChanged = false
 
     var body: some View {
         Form {
             Section {
-                Toggle("Show Icon Instead of Ping Time", isOn: Binding(
-                    get: { viewModel.showIconMode },
-                    set: { viewModel.setShowIconMode($0) }
-                ))
+                Toggle("Show Icon Instead of Ping Time", isOn: $showIconMode)
+                Toggle("Launch at Login", isOn: Binding(get: { launchAtLogin }, set: setLaunchAtLogin))
 
-                Toggle("Close on Outside Click", isOn: Binding(
-                    get: { viewModel.closeOnOutsideClick },
-                    set: { viewModel.setCloseOnOutsideClick($0) }
-                ))
-
-                Toggle("Launch at Login", isOn: Binding(
-                    get: { viewModel.launchAtLogin },
-                    set: { viewModel.setLaunchAtLogin($0) }
-                ))
-
-                Picker("Ping Interval", selection: Binding(
-                    get: { viewModel.pingInterval },
-                    set: { viewModel.setPingInterval($0) }
-                )) {
-                    Text("1s").tag(1.0)
-                    Text("2s").tag(2.0)
-                    Text("5s").tag(5.0)
-                    Text("10s").tag(10.0)
-                    Text("30s").tag(30.0)
-                    Text("60s").tag(60.0)
+                Picker("Ping Interval", selection: $pingInterval) {
+                    ForEach([1.0, 2, 5, 10, 30, 60], id: \.self) { seconds in
+                        Text("\(Int(seconds))s").tag(seconds)
+                    }
                 }
             }
 
             Section("Ping Targets") {
-                TextField("Internet Target", text: $internetTargetDraft, prompt: Text("1.1.1.1"))
+                TextField("Internet Target", text: $internetTargetDraft, prompt: Text(AppSettings.defaultInternetTarget))
                     .textFieldStyle(.roundedBorder)
-                    .onSubmit { saveTargets() }
-                    .onChange(of: internetTargetDraft) { _ in updateChanged() }
+                    .onSubmit(saveTargets)
 
-                TextField("DNS Hostname", text: $dnsHostnameDraft, prompt: Text("google.com"))
+                TextField("DNS Hostname", text: $dnsHostnameDraft, prompt: Text(AppSettings.defaultDNSHostname))
                     .textFieldStyle(.roundedBorder)
-                    .onSubmit { saveTargets() }
-                    .onChange(of: dnsHostnameDraft) { _ in updateChanged() }
+                    .onSubmit(saveTargets)
 
                 HStack {
                     Spacer()
-                    Button("Save") { saveTargets() }
-                        .disabled(!targetsChanged)
+                    Button("Save", action: saveTargets)
+                        .disabled(internetTargetDraft == internetTarget && dnsHostnameDraft == dnsHostname)
                 }
             }
         }
         .formStyle(.grouped)
         .frame(width: 280)
         .onAppear {
-            internetTargetDraft = viewModel.internetTarget
-            dnsHostnameDraft = viewModel.dnsHostname
+            internetTargetDraft = internetTarget
+            dnsHostnameDraft = dnsHostname
         }
-    }
-
-    private func updateChanged() {
-        targetsChanged = internetTargetDraft != viewModel.internetTarget
-            || dnsHostnameDraft != viewModel.dnsHostname
     }
 
     private func saveTargets() {
-        viewModel.setInternetTarget(internetTargetDraft.trimmingCharacters(in: .whitespaces))
-        viewModel.setDnsHostname(dnsHostnameDraft.trimmingCharacters(in: .whitespaces))
-        targetsChanged = false
+        func cleaned(_ draft: String, fallback: String) -> String {
+            let trimmed = draft.trimmingCharacters(in: .whitespaces)
+            return trimmed.isEmpty ? fallback : trimmed
+        }
+        internetTarget = cleaned(internetTargetDraft, fallback: AppSettings.defaultInternetTarget)
+        dnsHostname = cleaned(dnsHostnameDraft, fallback: AppSettings.defaultDNSHostname)
         NSApp.keyWindow?.close()
     }
-}
 
-class SettingsViewModel: ObservableObject {
-    @Published var launchAtLogin: Bool = false
-    @Published var pingInterval: Double = 1.0
-    @Published var internetTarget: String = ""
-    @Published var dnsHostname: String = ""
-    @Published var showIconMode: Bool = false
-    @Published var closeOnOutsideClick: Bool = true
-
-    init() {
-        if #available(macOS 13.0, *) {
-            launchAtLogin = SMAppService.mainApp.status == .enabled
-        }
-        let stored = UserDefaults.standard.double(forKey: "pingInterval")
-        pingInterval = stored > 0 ? stored : Defaults.pingInterval
-
-        internetTarget = UserDefaults.standard.string(forKey: "internetTarget") ?? ""
-        dnsHostname = UserDefaults.standard.string(forKey: "dnsHostname") ?? ""
-        showIconMode = UserDefaults.standard.bool(forKey: "showIconMode")
-        closeOnOutsideClick = UserDefaults.standard.object(forKey: "closeOnOutsideClick") as? Bool ?? Defaults.closeOnOutsideClick
-    }
-
-    func setLaunchAtLogin(_ enabled: Bool) {
-        if #available(macOS 13.0, *) {
-            do {
-                if enabled {
-                    try SMAppService.mainApp.register()
-                } else {
-                    try SMAppService.mainApp.unregister()
-                }
-                launchAtLogin = enabled
-            } catch {
-                print("Failed to set launch at login: \(error)")
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
             }
+            launchAtLogin = enabled
+        } catch {
+            print("Failed to set launch at login: \(error)")
         }
-    }
-
-    func setPingInterval(_ interval: Double) {
-        pingInterval = interval
-        UserDefaults.standard.set(interval, forKey: "pingInterval")
-        NotificationCenter.default.post(name: .pingIntervalChanged, object: nil)
-    }
-
-    func setInternetTarget(_ value: String) {
-        internetTarget = value
-        UserDefaults.standard.set(value, forKey: "internetTarget")
-        NotificationCenter.default.post(name: .pingTargetsChanged, object: nil)
-    }
-
-    func setDnsHostname(_ value: String) {
-        dnsHostname = value
-        UserDefaults.standard.set(value, forKey: "dnsHostname")
-        NotificationCenter.default.post(name: .pingTargetsChanged, object: nil)
-    }
-
-    func setShowIconMode(_ enabled: Bool) {
-        showIconMode = enabled
-        UserDefaults.standard.set(enabled, forKey: "showIconMode")
-        NotificationCenter.default.post(name: .displayModeChanged, object: nil)
-    }
-
-    func setCloseOnOutsideClick(_ enabled: Bool) {
-        closeOnOutsideClick = enabled
-        UserDefaults.standard.set(enabled, forKey: "closeOnOutsideClick")
     }
 }

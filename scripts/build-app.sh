@@ -21,4 +21,12 @@ cp "$BUILD_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/"
 cp "$PROJECT_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/"
 cp "$PROJECT_DIR/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
 
+# Releases pass the tag's version (e.g. VERSION=2.5.0); local builds keep the placeholder in Info.plist.
+if [[ -n "${VERSION:-}" ]]; then
+    /usr/libexec/PlistBuddy \
+        -c "Set :CFBundleShortVersionString $VERSION" \
+        -c "Set :CFBundleVersion $VERSION" \
+        "$APP_BUNDLE/Contents/Info.plist"
+fi
+
 echo "Done! App bundle created at: $APP_BUNDLE"

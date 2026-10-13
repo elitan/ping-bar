@@ -1,22 +1,14 @@
 import Foundation
 import CoreLocation
 
+/// macOS only reveals the WiFi network name to apps with location permission.
 class LocationManager: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
-    var onAuthorizationChanged: ((CLAuthorizationStatus) -> Void)?
+    var onAuthorizationChanged: (() -> Void)?
 
     override init() {
         super.init()
         manager.delegate = self
-    }
-
-    var authorizationStatus: CLAuthorizationStatus {
-        manager.authorizationStatus
-    }
-
-    var isAuthorized: Bool {
-        let status = authorizationStatus
-        return status == .authorized || status == .authorizedAlways
     }
 
     func requestPermission() {
@@ -24,6 +16,6 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        onAuthorizationChanged?(manager.authorizationStatus)
+        onAuthorizationChanged?()
     }
 }

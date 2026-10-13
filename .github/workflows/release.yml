@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +34,7 @@ jobs:
           security list-keychain -d user -s $KEYCHAIN_PATH
 
       - name: Build app bundle
-        run: ./scripts/build-app.sh
+        run: VERSION="${GITHUB_REF_NAME#v}" ./scripts/build-app.sh
 
       - name: Sign app
         env:
@@ -95,7 +95,7 @@ jobs:
           path: .build/release/PingBar.dmg
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: .build/release/PingBar.dmg
           generate_release_notes: true

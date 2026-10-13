@@ -1,184 +1,110 @@
 import Cocoa
+import Combine
 import SwiftUI
 
-class StatusBarController {
-    private var statusItem: NSStatusItem
-    private let diagnosticsService = DiagnosticsService()
+@MainActor
+final class StatusBarController: NSObject, NSPopoverDelegate {
+    private let statusItem = NSStatusBar.system.statusItem(withLength: 45)
+    private let diagnostics = Diagnostics()
+    private let popover = NSPopover()
     private var settingsWindow: NSWindow?
-    private var popover: NSPopover!
-    private var viewModel: DiagnosticsViewModel!
-    private var displayModeObserver: NSObjectProtocol?
-    private var eventMonitor: Any?
+    private var displayObserver: AnyCancellable?
 
-    init() {
-        statusItem = NSStatusBar.system.statusItem(withLength: 45)
-        setupStatusItem()
-        setupPopover()
-        setupDiagnosticsService()
+    override init() {
+        super.init()
 
-        displayModeObserver = NotificationCenter.default.addObserver(
-            forName: .displayModeChanged, object: nil, queue: .main
-        ) { [weak self] _ in
-            guard let self = self else { return }
-            let latency = self.diagnosticsService.isRunning ? self.diagnosticsService.internetHistory.latest : nil
-            let smoothed = self.diagnosticsService.isRunning ? self.diagnosticsService.internetHistory.recentWeightedAverage : nil
-            self.updateDisplay(latency: latency, smoothedLatency: smoothed)
-        }
-
-        viewModel.start()
-    }
-
-    private func setupStatusItem() {
-        updateDisplay(latency: nil, smoothedLatency: nil)
-
-        if let button = statusItem.button {
-            button.action = #selector(togglePopover)
-            button.target = self
-        }
-    }
-
-    private func setupPopover() {
-        viewModel = DiagnosticsViewModel(service: diagnosticsService)
-
-        let diagnosticsView = DiagnosticsView(
-            viewModel: viewModel,
-            onSettings: { [weak self] in
-                self?.showSettings()
-            },
-            onQuit: { [weak self] in
-                self?.quit()
-            }
-        )
-
-        popover = NSPopover()
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 320, height: 440)
-        popover.contentViewController = NSHostingController(rootView: diagnosticsView)
+        popover.delegate = self
+        popover.contentViewController = NSHostingController(rootView: DiagnosticsView(
+            diagnostics: diagnostics,
+            onSettings: { [weak self] in self?.showSettings() },
+            onQuit: { NSApp.terminate(nil) }
+        ))
+
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(togglePopover)
+
+        displayObserver = Publishers.CombineLatest3(diagnostics.$internet, diagnostics.$isRunning, diagnostics.$settings)
+            .sink { [weak self] internet, isRunning, settings in
+                self?.updateButton(internet: internet, isRunning: isRunning, iconMode: settings.showIconMode)
+            }
+
+        diagnostics.start()
     }
 
-    private func setupDiagnosticsService() {
-        diagnosticsService.onUpdate = { [weak self] in
-            guard let self = self else { return }
-            let latency = self.diagnosticsService.isRunning ? self.diagnosticsService.internetHistory.latest : nil
-            let smoothed = self.diagnosticsService.isRunning ? self.diagnosticsService.internetHistory.recentWeightedAverage : nil
-            self.updateDisplay(latency: latency, smoothedLatency: smoothed)
-            self.viewModel.refresh()
-        }
-    }
-
-    private func updateDisplay(latency: Double?, smoothedLatency: Double?) {
+    private func updateButton(internet: MetricHistory, isRunning: Bool, iconMode: Bool) {
         guard let button = statusItem.button else { return }
-
-        let (text, color): (String, NSColor) = {
-            guard diagnosticsService.isRunning else {
-                return ("---", .secondaryLabelColor)
-            }
-            guard let ms = latency else {
-                return ("---", .systemRed)
-            }
-            if ms >= 1000 {
-                return (String(format: "%.1fs", ms / 1000), latencyColor(smoothedLatency))
-            }
-            return ("\(Int(ms.rounded()))ms", latencyColor(smoothedLatency))
-        }()
-
-        let iconMode = UserDefaults.standard.bool(forKey: "showIconMode")
+        let color = isRunning ? latencyColor(internet) : .secondaryLabelColor
 
         if iconMode {
             statusItem.length = NSStatusItem.squareLength
             button.attributedTitle = NSAttributedString()
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-            if let base = NSImage(systemSymbolName: "wifi", accessibilityDescription: "Ping status"),
-               let configured = base.withSymbolConfiguration(config) {
-                let coloredImage = NSImage(size: configured.size, flipped: false) { rect in
-                    configured.draw(in: rect)
-                    color.set()
-                    rect.fill(using: .sourceAtop)
-                    return true
-                }
-                coloredImage.isTemplate = false
-                button.image = coloredImage
-            }
+            button.image = tintedSymbol("wifi", color: color)
         } else {
             statusItem.length = 45
             button.image = nil
-            let attributes: [NSAttributedString.Key: Any] = [
-                .foregroundColor: color,
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-            ]
-            button.attributedTitle = NSAttributedString(string: text, attributes: attributes)
+            button.attributedTitle = NSAttributedString(
+                string: isRunning ? formatLatency(internet.latest) : "---",
+                attributes: [
+                    .foregroundColor: color,
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
+                ]
+            )
         }
+    }
+
+    /// Menu bar images are normally templated to black/white, so draw a non-template colored copy.
+    private func tintedSymbol(_ name: String, color: NSColor) -> NSImage? {
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: "Ping status")?
+            .withSymbolConfiguration(.init(pointSize: 14, weight: .medium)) else { return nil }
+        let image = NSImage(size: symbol.size, flipped: false) { rect in
+            symbol.draw(in: rect)
+            color.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        image.isTemplate = false
+        return image
     }
 
     @objc private func togglePopover() {
-        guard let button = statusItem.button else { return }
-
         if popover.isShown {
-            closePopover()
-        } else {
-            viewModel.refresh()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            startEventMonitor()
-        }
-    }
-
-    private func closePopover() {
-        popover.close()
-        stopEventMonitor()
-    }
-
-    private func startEventMonitor() {
-        guard UserDefaults.standard.object(forKey: "closeOnOutsideClick") as? Bool ?? Defaults.closeOnOutsideClick else { return }
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.closePopover()
-        }
-    }
-
-    private func stopEventMonitor() {
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-        }
-    }
-
-    private var settingsCloseObserver: NSObjectProtocol?
-
-    private func showSettings() {
-        popover.behavior = .applicationDefined
-
-        if let window = settingsWindow {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            popover.performClose(nil)
             return
         }
-
-        let hostingView = NSHostingView(rootView: SettingsView())
-        hostingView.setFrameSize(hostingView.fittingSize)
-
-        let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "PingBar Settings"
-        window.contentView = hostingView
-        window.center()
-        window.isReleasedWhenClosed = false
-        settingsWindow = window
-
-        settingsCloseObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification, object: window, queue: .main
-        ) { [weak self] _ in
-            self?.popover.behavior = .transient
-        }
-
-        window.makeKeyAndOrderFront(nil)
+        guard let button = statusItem.button else { return }
+        // Activating the app lets the transient popover close when the user clicks anywhere else.
         NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
-    private func quit() {
-        diagnosticsService.stop()
-        NSApp.terminate(nil)
+    func popoverWillShow(_ notification: Notification) {
+        diagnostics.isPopoverShown = true
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        diagnostics.isPopoverShown = false
+    }
+
+    private func showSettings() {
+        popover.performClose(nil)
+
+        if settingsWindow == nil {
+            let hostingView = NSHostingView(rootView: SettingsView())
+            let window = NSWindow(
+                contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "PingBar Settings"
+            window.contentView = hostingView
+            window.isReleasedWhenClosed = false
+            window.center()
+            settingsWindow = window
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 }

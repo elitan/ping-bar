@@ -7,11 +7,12 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "PingBar",
-            path: "Sources/PingBar",
-            linkerSettings: [
-                .linkedFramework("ServiceManagement"),
-                .linkedFramework("CoreWLAN")
-            ]
-        )
+            path: "Sources/PingBar"
+        ),
+        .testTarget(
+            name: "PingBarTests",
+            dependencies: ["PingBar"],
+            path: "Tests/PingBarTests"
+        ),
     ]
 )

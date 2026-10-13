@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DiagnosticsView: View {
-    @ObservedObject var viewModel: DiagnosticsViewModel
+    @ObservedObject var diagnostics: Diagnostics
     var onSettings: () -> Void
     var onQuit: () -> Void
 
@@ -9,9 +9,9 @@ struct DiagnosticsView: View {
         VStack(alignment: .leading, spacing: 0) {
             wifiSection
             Divider().padding(.vertical, 8)
-            routerSection
+            latencySection("Router", detail: diagnostics.gatewayIP, history: diagnostics.router)
             Divider().padding(.vertical, 8)
-            internetSection
+            latencySection("Internet", detail: diagnostics.settings.internetTarget, history: diagnostics.internet)
             Divider().padding(.vertical, 8)
             dnsSection
             Divider().padding(.vertical, 8)
@@ -26,17 +26,17 @@ struct DiagnosticsView: View {
         VStack(alignment: .leading, spacing: 6) {
             sectionHeader("WiFi")
 
-            if let wifi = viewModel.wifiInfo {
+            if let wifi = diagnostics.wifi {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(viewModel.isCaptivePortal ? Color.orange : Color.green)
+                        .fill(diagnostics.captivePortalURL == nil ? Color.green : Color.orange)
                         .frame(width: 8, height: 8)
                     if let ssid = wifi.ssid {
                         Text(ssid)
                             .font(.system(size: 14, weight: .medium))
                     } else {
                         Button("Grant Permission") {
-                            viewModel.requestLocationPermission()
+                            diagnostics.requestLocationPermission()
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -50,12 +50,12 @@ struct DiagnosticsView: View {
                         .cornerRadius(4)
                 }
 
-                if viewModel.isCaptivePortal {
-                    captivePortalWarning
+                if let loginURL = diagnostics.captivePortalURL {
+                    captivePortalWarning(loginURL)
                 }
 
                 HStack(spacing: 16) {
-                    wifiMetric("Signal", "\(wifi.rssi) dBm", viewModel.colorForSignal(wifi.rssi))
+                    wifiMetric("Signal", "\(wifi.rssi) dBm", Color(nsColor: signalColor(wifi.rssi)))
                     wifiMetric("Noise", "\(wifi.noise) dBm", .secondary)
                     wifiMetric("Rate", "\(Int(wifi.linkRate)) Mbps", .primary)
                 }
@@ -67,7 +67,7 @@ struct DiagnosticsView: View {
         }
     }
 
-    private var captivePortalWarning: some View {
+    private func captivePortalWarning(_ loginURL: URL) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -79,7 +79,7 @@ struct DiagnosticsView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
             Button {
-                viewModel.openCaptivePortalLogin()
+                NSWorkspace.shared.open(loginURL)
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.up.forward.square")
@@ -110,126 +110,59 @@ struct DiagnosticsView: View {
         }
     }
 
-    private var routerSection: some View {
+    private func latencySection(_ title: String, detail: String?, history: MetricHistory) -> some View {
         VStack(alignment: .leading, spacing: 6) {
+            sectionHeader(title, detail: detail)
+            MetricRowView(label: "Latency", history: history, showsJitter: true)
             HStack {
-                sectionHeader("Router")
-                Spacer()
-                if let gateway = viewModel.gatewayIP {
-                    Text(gateway)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            MetricRowView(
-                label: "Latency",
-                value: formatLatency(viewModel.routerLatency),
-                color: viewModel.colorForPing(viewModel.routerLatency, smoothed: viewModel.routerSmoothed),
-                history: viewModel.routerHistory,
-                subtitle: formatJitter(viewModel.routerJitter)
-            )
-
-            lossRow(viewModel.routerLoss)
-        }
-    }
-
-    private var internetSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                sectionHeader("Internet")
-                Spacer()
-                Text(viewModel.internetTargetLabel)
-                    .font(.system(size: 10, design: .monospaced))
+                Text("Loss")
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
+                Text(String(format: "%.1f%%", history.lossPercentage))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundColor(Color(nsColor: lossColor(history.lossPercentage)))
             }
-
-            MetricRowView(
-                label: "Latency",
-                value: formatLatency(viewModel.internetLatency),
-                color: viewModel.colorForPing(viewModel.internetLatency, smoothed: viewModel.internetSmoothed),
-                history: viewModel.internetHistory,
-                subtitle: formatJitter(viewModel.internetJitter)
-            )
-
-            lossRow(viewModel.internetLoss)
         }
     }
 
     private var dnsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                sectionHeader("DNS")
-                Spacer()
-                Text(viewModel.dnsServerIP ?? "---")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.secondary)
-            }
-
-            MetricRowView(
-                label: "Lookup",
-                value: formatLatency(viewModel.dnsLatency),
-                color: viewModel.colorForPing(viewModel.dnsLatency, smoothed: viewModel.dnsSmoothed),
-                history: viewModel.dnsHistory
-            )
+            sectionHeader("DNS", detail: diagnostics.dnsServerIP ?? "---")
+            MetricRowView(label: "Lookup", history: diagnostics.dns)
         }
     }
 
     private var footerSection: some View {
         HStack {
-            Button(viewModel.isRunning ? "Stop" : "Start") {
-                if viewModel.isRunning {
-                    viewModel.stop()
-                } else {
-                    viewModel.start()
-                }
+            Button(diagnostics.isRunning ? "Stop" : "Start") {
+                diagnostics.isRunning ? diagnostics.stop() : diagnostics.start()
             }
             .buttonStyle(.bordered)
 
             Spacer()
 
-            Button("Settings") {
-                onSettings()
-            }
-            .buttonStyle(.plain)
-            .foregroundColor(.secondary)
-
-            Button("Quit") {
-                onQuit()
-            }
-            .buttonStyle(.plain)
-            .foregroundColor(.secondary)
-        }
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(.secondary)
-            .textCase(.uppercase)
-    }
-
-    private func lossRow(_ loss: Double) -> some View {
-        HStack {
-            Text("Loss")
-                .font(.system(size: 11))
+            Button("Settings", action: onSettings)
+                .buttonStyle(.plain)
                 .foregroundColor(.secondary)
-            Text(String(format: "%.1f%%", loss))
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundColor(viewModel.colorForLoss(loss))
+
+            Button("Quit", action: onQuit)
+                .buttonStyle(.plain)
+                .foregroundColor(.secondary)
         }
     }
 
-    private func formatLatency(_ ms: Double?) -> String {
-        guard let ms = ms else { return "---" }
-        if ms >= 1000 {
-            return String(format: "%.1fs", ms / 1000)
+    private func sectionHeader(_ title: String, detail: String? = nil) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+            Spacer()
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
         }
-        return "\(Int(ms.rounded()))ms"
-    }
-
-    private func formatJitter(_ jitter: Double?) -> String? {
-        guard let j = jitter else { return nil }
-        return "±\(Int(j.rounded()))ms"
     }
 }
